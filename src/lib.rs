@@ -807,6 +807,30 @@ impl WalletClient {
         Ok(())
     }
 
+    /// Check if the wallet is a multisig wallet and get its configuration.
+    pub async fn is_multisig(&self) -> anyhow::Result<IsMultisigResult> {
+        let params = empty();
+        self.inner
+            .request("is_multisig", RpcParams::map(params))
+            .await
+    }
+
+    /// Sign a multisig transaction.
+    pub async fn sign_multisig(&self, tx_data_hex: String) -> anyhow::Result<SignMultisigResult> {
+        let params = once(("tx_data_hex", tx_data_hex.into()));
+        self.inner
+            .request("sign_multisig", RpcParams::map(params))
+            .await
+    }
+
+    /// Submit a signed multisig transaction to the network.
+    pub async fn submit_multisig(&self, tx_data_hex: String) -> anyhow::Result<SubmitMultisigResult> {
+        let params = once(("tx_data_hex", tx_data_hex.into()));
+        self.inner
+            .request("submit_multisig", RpcParams::map(params))
+            .await
+    }
+
     /// Return the wallet's balance.
     pub async fn get_balance(
         &self,

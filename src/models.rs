@@ -620,6 +620,35 @@ pub struct TxProofOutput {
     pub received: Amount,
 }
 
+/// Return type of wallet `is_multisig`.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct IsMultisigResult {
+    /// States if the wallet is multisig.
+    pub multisig: bool,
+    /// States if the wallet is ready (all setup rounds completed).
+    pub ready: bool,
+    /// Number of signatures required (M in M-of-N).
+    pub threshold: u32,
+    /// Total number of signers (N in M-of-N).
+    pub total: u32,
+}
+
+/// Return type of wallet `sign_multisig`.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct SignMultisigResult {
+    /// Multisig transaction in hex format, possibly with additional signatures.
+    pub tx_data_hex: String,
+    /// List of transaction hashes.
+    pub tx_hash_list: Vec<HashString<CryptoNoteHash>>,
+}
+
+/// Return type of wallet `submit_multisig`.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct SubmitMultisigResult {
+    /// List of transaction hashes submitted to the network.
+    pub tx_hash_list: Vec<HashString<CryptoNoteHash>>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
