@@ -1615,4 +1615,545 @@ mod tests {
             "Invalid variant 4, expected 0-3",
         );
     }
+
+    // Multisig method tests with mockito
+
+    #[tokio::test]
+    async fn test_is_multisig_success() {
+        use mockito::{Matcher, Mock};
+
+        let mut server = mockito::Server::new_async().await;
+        let url = server.url();
+
+        // Mock successful is_multisig response
+        let _mock = server
+            .mock("POST", "/json_rpc")
+            .match_header("content-type", "application/json")
+            .match_body(Matcher::PartialJsonString(
+                r#"{"method":"is_multisig"}"#.to_string(),
+            ))
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                r#"{
+                    "id": "0",
+                    "jsonrpc": "2.0",
+                    "result": {
+                        "multisig": true,
+                        "ready": true,
+                        "threshold": 2,
+                        "total": 3
+                    }
+                }"#,
+            )
+            .create_async()
+            .await;
+
+        let client = RpcClientBuilder::new().build(url).unwrap();
+        let wallet = client.wallet();
+
+        let result = wallet.is_multisig().await.unwrap();
+
+        assert_eq!(result.multisig, true);
+        assert_eq!(result.ready, true);
+        assert_eq!(result.threshold, 2);
+        assert_eq!(result.total, 3);
+    }
+
+    #[tokio::test]
+    async fn test_is_multisig_not_multisig() {
+        use mockito::{Matcher, Mock};
+
+        let mut server = mockito::Server::new_async().await;
+        let url = server.url();
+
+        // Mock response for non-multisig wallet
+        let _mock = server
+            .mock("POST", "/json_rpc")
+            .match_header("content-type", "application/json")
+            .match_body(Matcher::PartialJsonString(
+                r#"{"method":"is_multisig"}"#.to_string(),
+            ))
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                r#"{
+                    "id": "0",
+                    "jsonrpc": "2.0",
+                    "result": {
+                        "multisig": false,
+                        "ready": false,
+                        "threshold": 0,
+                        "total": 0
+                    }
+                }"#,
+            )
+            .create_async()
+            .await;
+
+        let client = RpcClientBuilder::new().build(url).unwrap();
+        let wallet = client.wallet();
+
+        let result = wallet.is_multisig().await.unwrap();
+
+        assert_eq!(result.multisig, false);
+        assert_eq!(result.ready, false);
+        assert_eq!(result.threshold, 0);
+        assert_eq!(result.total, 0);
+    }
+
+    #[tokio::test]
+    async fn test_is_multisig_not_ready() {
+        use mockito::{Matcher, Mock};
+
+        let mut server = mockito::Server::new_async().await;
+        let url = server.url();
+
+        // Mock response for multisig wallet that's not ready
+        let _mock = server
+            .mock("POST", "/json_rpc")
+            .match_header("content-type", "application/json")
+            .match_body(Matcher::PartialJsonString(
+                r#"{"method":"is_multisig"}"#.to_string(),
+            ))
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                r#"{
+                    "id": "0",
+                    "jsonrpc": "2.0",
+                    "result": {
+                        "multisig": true,
+                        "ready": false,
+                        "threshold": 2,
+                        "total": 3
+                    }
+                }"#,
+            )
+            .create_async()
+            .await;
+
+        let client = RpcClientBuilder::new().build(url).unwrap();
+        let wallet = client.wallet();
+
+        let result = wallet.is_multisig().await.unwrap();
+
+        assert_eq!(result.multisig, true);
+        assert_eq!(result.ready, false);
+        assert_eq!(result.threshold, 2);
+        assert_eq!(result.total, 3);
+    }
+
+    #[tokio::test]
+    async fn test_is_multisig_error_no_wallet() {
+        use mockito::{Matcher, Mock};
+
+        let mut server = mockito::Server::new_async().await;
+        let url = server.url();
+
+        // Mock error response - no wallet file
+        let _mock = server
+            .mock("POST", "/json_rpc")
+            .match_header("content-type", "application/json")
+            .match_body(Matcher::PartialJsonString(
+                r#"{"method":"is_multisig"}"#.to_string(),
+            ))
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                r#"{
+                    "id": "0",
+                    "jsonrpc": "2.0",
+                    "error": {
+                        "code": -13,
+                        "message": "No wallet file"
+                    }
+                }"#,
+            )
+            .create_async()
+            .await;
+
+        let client = RpcClientBuilder::new().build(url).unwrap();
+        let wallet = client.wallet();
+
+        let result = wallet.is_multisig().await;
+
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("No wallet file"));
+    }
+
+    #[tokio::test]
+    async fn test_sign_multisig_success() {
+        use mockito::{Matcher, Mock};
+
+        let mut server = mockito::Server::new_async().await;
+        let url = server.url();
+
+        let tx_data_hex = "0123456789abcdef".to_string();
+        let signed_tx_data_hex = "fedcba9876543210".to_string(); // Different valid hex for signed version
+        // Use valid 64-character hex hash (32 bytes) - exactly 64 hex chars
+        let expected_tx_hash = "a1b2c3d4e5f67890123456789abcdef0fedcba9876543210fedcba9876543210".to_string();
+
+        // Mock successful sign_multisig response
+        let _mock = server
+            .mock("POST", "/json_rpc")
+            .match_header("content-type", "application/json")
+            .match_body(Matcher::PartialJsonString(
+                r#"{"method":"sign_multisig","params":{"tx_data_hex":"0123456789abcdef"}}"#
+                    .to_string(),
+            ))
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(format!(
+                r#"{{
+                    "id": "0",
+                    "jsonrpc": "2.0",
+                    "result": {{
+                        "tx_data_hex": "{}",
+                        "tx_hash_list": ["{}"]
+                    }}
+                }}"#,
+                signed_tx_data_hex, expected_tx_hash
+            ))
+            .create_async()
+            .await;
+
+        let client = RpcClientBuilder::new().build(url).unwrap();
+        let wallet = client.wallet();
+
+        let result = wallet.sign_multisig(tx_data_hex.clone()).await.unwrap();
+
+        assert_eq!(result.tx_data_hex, signed_tx_data_hex);
+        assert_eq!(result.tx_hash_list.len(), 1);
+        assert_eq!(result.tx_hash_list[0].to_string(), expected_tx_hash);
+    }
+
+    #[tokio::test]
+    async fn test_sign_multisig_multiple_hashes() {
+        use mockito::{Matcher, Mock};
+
+        let mut server = mockito::Server::new_async().await;
+        let url = server.url();
+
+        let tx_data_hex = "multitx123".to_string();
+        // Use valid 64-character hex hashes (32 bytes each)
+        let hash1 = "1111111111111111111111111111111111111111111111111111111111111111".to_string();
+        let hash2 = "2222222222222222222222222222222222222222222222222222222222222222".to_string();
+        let hash3 = "3333333333333333333333333333333333333333333333333333333333333333".to_string();
+
+        // Mock response with multiple transaction hashes
+        let _mock = server
+            .mock("POST", "/json_rpc")
+            .match_header("content-type", "application/json")
+            .match_body(Matcher::PartialJsonString(
+                r#"{"method":"sign_multisig"}"#.to_string(),
+            ))
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(format!(
+                r#"{{
+                    "id": "0",
+                    "jsonrpc": "2.0",
+                    "result": {{
+                        "tx_data_hex": "signedmultitx123",
+                        "tx_hash_list": ["{}", "{}", "{}"]
+                    }}
+                }}"#,
+                hash1, hash2, hash3
+            ))
+            .create_async()
+            .await;
+
+        let client = RpcClientBuilder::new().build(url).unwrap();
+        let wallet = client.wallet();
+
+        let result = wallet.sign_multisig(tx_data_hex).await.unwrap();
+
+        assert_eq!(result.tx_hash_list.len(), 3);
+        assert_eq!(result.tx_hash_list[0].to_string(), hash1);
+        assert_eq!(result.tx_hash_list[1].to_string(), hash2);
+        assert_eq!(result.tx_hash_list[2].to_string(), hash3);
+    }
+
+    #[tokio::test]
+    async fn test_sign_multisig_error_not_multisig() {
+        use mockito::{Matcher, Mock};
+
+        let mut server = mockito::Server::new_async().await;
+        let url = server.url();
+
+        // Mock error response - wallet is not multisig
+        let _mock = server
+            .mock("POST", "/json_rpc")
+            .match_header("content-type", "application/json")
+            .match_body(Matcher::PartialJsonString(
+                r#"{"method":"sign_multisig"}"#.to_string(),
+            ))
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                r#"{
+                    "id": "0",
+                    "jsonrpc": "2.0",
+                    "error": {
+                        "code": -37,
+                        "message": "This wallet is not multisig"
+                    }
+                }"#,
+            )
+            .create_async()
+            .await;
+
+        let client = RpcClientBuilder::new().build(url).unwrap();
+        let wallet = client.wallet();
+
+        let result = wallet.sign_multisig("dummy_tx".to_string()).await;
+
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("not multisig"));
+    }
+
+    #[tokio::test]
+    async fn test_sign_multisig_error_invalid_tx_data() {
+        use mockito::{Matcher, Mock};
+
+        let mut server = mockito::Server::new_async().await;
+        let url = server.url();
+
+        // Mock error response - invalid transaction data
+        let _mock = server
+            .mock("POST", "/json_rpc")
+            .match_header("content-type", "application/json")
+            .match_body(Matcher::PartialJsonString(
+                r#"{"method":"sign_multisig"}"#.to_string(),
+            ))
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                r#"{
+                    "id": "0",
+                    "jsonrpc": "2.0",
+                    "error": {
+                        "code": -8,
+                        "message": "Failed to parse transaction data"
+                    }
+                }"#,
+            )
+            .create_async()
+            .await;
+
+        let client = RpcClientBuilder::new().build(url).unwrap();
+        let wallet = client.wallet();
+
+        let result = wallet.sign_multisig("invalid_hex".to_string()).await;
+
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("Failed to parse"));
+    }
+
+    #[tokio::test]
+    async fn test_submit_multisig_success() {
+        use mockito::{Matcher, Mock};
+
+        let mut server = mockito::Server::new_async().await;
+        let url = server.url();
+
+        let signed_tx_hex = "fullysigned123".to_string();
+        // Use valid 64-character hex hash (32 bytes)
+        let expected_tx_hash = "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789".to_string();
+
+        // Mock successful submit_multisig response
+        let _mock = server
+            .mock("POST", "/json_rpc")
+            .match_header("content-type", "application/json")
+            .match_body(Matcher::PartialJsonString(
+                r#"{"method":"submit_multisig","params":{"tx_data_hex":"fullysigned123"}}"#
+                    .to_string(),
+            ))
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(format!(
+                r#"{{
+                    "id": "0",
+                    "jsonrpc": "2.0",
+                    "result": {{
+                        "tx_hash_list": ["{}"]
+                    }}
+                }}"#,
+                expected_tx_hash
+            ))
+            .create_async()
+            .await;
+
+        let client = RpcClientBuilder::new().build(url).unwrap();
+        let wallet = client.wallet();
+
+        let result = wallet.submit_multisig(signed_tx_hex).await.unwrap();
+
+        assert_eq!(result.tx_hash_list.len(), 1);
+        assert_eq!(result.tx_hash_list[0].to_string(), expected_tx_hash);
+    }
+
+    #[tokio::test]
+    async fn test_submit_multisig_multiple_transactions() {
+        use mockito::{Matcher, Mock};
+
+        let mut server = mockito::Server::new_async().await;
+        let url = server.url();
+
+        // Use valid 64-character hex hashes (32 bytes each)
+        let tx1_hash = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_string();
+        let tx2_hash = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".to_string();
+
+        // Mock response with multiple submitted transaction hashes
+        let _mock = server
+            .mock("POST", "/json_rpc")
+            .match_header("content-type", "application/json")
+            .match_body(Matcher::PartialJsonString(
+                r#"{"method":"submit_multisig"}"#.to_string(),
+            ))
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(format!(
+                r#"{{
+                    "id": "0",
+                    "jsonrpc": "2.0",
+                    "result": {{
+                        "tx_hash_list": ["{}", "{}"]
+                    }}
+                }}"#,
+                tx1_hash, tx2_hash
+            ))
+            .create_async()
+            .await;
+
+        let client = RpcClientBuilder::new().build(url).unwrap();
+        let wallet = client.wallet();
+
+        let result = wallet.submit_multisig("multitx_signed".to_string()).await.unwrap();
+
+        assert_eq!(result.tx_hash_list.len(), 2);
+        assert_eq!(result.tx_hash_list[0].to_string(), tx1_hash);
+        assert_eq!(result.tx_hash_list[1].to_string(), tx2_hash);
+    }
+
+    #[tokio::test]
+    async fn test_submit_multisig_error_not_enough_signatures() {
+        use mockito::{Matcher, Mock};
+
+        let mut server = mockito::Server::new_async().await;
+        let url = server.url();
+
+        // Mock error response - not enough signatures
+        let _mock = server
+            .mock("POST", "/json_rpc")
+            .match_header("content-type", "application/json")
+            .match_body(Matcher::PartialJsonString(
+                r#"{"method":"submit_multisig"}"#.to_string(),
+            ))
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                r#"{
+                    "id": "0",
+                    "jsonrpc": "2.0",
+                    "error": {
+                        "code": -38,
+                        "message": "Not enough signers signed this transaction"
+                    }
+                }"#,
+            )
+            .create_async()
+            .await;
+
+        let client = RpcClientBuilder::new().build(url).unwrap();
+        let wallet = client.wallet();
+
+        let result = wallet.submit_multisig("partially_signed".to_string()).await;
+
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("Not enough signers"));
+    }
+
+    #[tokio::test]
+    async fn test_submit_multisig_error_already_submitted() {
+        use mockito::{Matcher, Mock};
+
+        let mut server = mockito::Server::new_async().await;
+        let url = server.url();
+
+        // Mock error response - transaction already in pool
+        let _mock = server
+            .mock("POST", "/json_rpc")
+            .match_header("content-type", "application/json")
+            .match_body(Matcher::PartialJsonString(
+                r#"{"method":"submit_multisig"}"#.to_string(),
+            ))
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                r#"{
+                    "id": "0",
+                    "jsonrpc": "2.0",
+                    "error": {
+                        "code": -32,
+                        "message": "Transaction already in pool"
+                    }
+                }"#,
+            )
+            .create_async()
+            .await;
+
+        let client = RpcClientBuilder::new().build(url).unwrap();
+        let wallet = client.wallet();
+
+        let result = wallet.submit_multisig("already_submitted".to_string()).await;
+
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("already in pool"));
+    }
+
+    #[tokio::test]
+    async fn test_submit_multisig_error_invalid_transaction() {
+        use mockito::{Matcher, Mock};
+
+        let mut server = mockito::Server::new_async().await;
+        let url = server.url();
+
+        // Mock error response - invalid transaction
+        let _mock = server
+            .mock("POST", "/json_rpc")
+            .match_header("content-type", "application/json")
+            .match_body(Matcher::PartialJsonString(
+                r#"{"method":"submit_multisig"}"#.to_string(),
+            ))
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                r#"{
+                    "id": "0",
+                    "jsonrpc": "2.0",
+                    "error": {
+                        "code": -22,
+                        "message": "Transaction verification failed"
+                    }
+                }"#,
+            )
+            .create_async()
+            .await;
+
+        let client = RpcClientBuilder::new().build(url).unwrap();
+        let wallet = client.wallet();
+
+        let result = wallet.submit_multisig("invalid_tx".to_string()).await;
+
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("verification failed"));
+    }
 }
