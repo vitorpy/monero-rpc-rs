@@ -831,6 +831,24 @@ impl WalletClient {
             .await
     }
 
+    /// Export multisig info (key images) from this wallet.
+    /// This must be called and exchanged between all participants before creating transactions.
+    pub async fn export_multisig_info(&self) -> anyhow::Result<ExportMultisigInfoResult> {
+        let params = empty();
+        self.inner
+            .request("export_multisig_info", RpcParams::map(params))
+            .await
+    }
+
+    /// Import multisig info (key images) from other participants.
+    /// Must be called with info from all other participants before creating transactions.
+    pub async fn import_multisig_info(&self, info: Vec<String>) -> anyhow::Result<ImportMultisigInfoResult> {
+        let params = once(("info", info.into_iter().map(Value::from).collect::<Vec<_>>().into()));
+        self.inner
+            .request("import_multisig_info", RpcParams::map(params))
+            .await
+    }
+
     /// Return the wallet's balance.
     pub async fn get_balance(
         &self,

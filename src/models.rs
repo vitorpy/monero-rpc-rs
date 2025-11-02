@@ -239,6 +239,10 @@ pub struct TransferData {
     pub tx_key: HashString<Vec<u8>>,
     pub tx_metadata: HashString<Vec<u8>>,
     pub unsigned_txset: HashString<Vec<u8>>,
+    /// For multisig wallets: unsigned transaction set that needs to be signed.
+    /// This field is populated instead of tx_blob for multisig transactions.
+    #[serde(default)]
+    pub multisig_txset: String,
 }
 
 /// Sub-type of [`AddressData`]'s return type of wallet `get_address`.
@@ -647,6 +651,20 @@ pub struct SignMultisigResult {
 pub struct SubmitMultisigResult {
     /// List of transaction hashes submitted to the network.
     pub tx_hash_list: Vec<HashString<CryptoNoteHash>>,
+}
+
+/// Return type of wallet `export_multisig_info`.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ExportMultisigInfoResult {
+    /// Multisig info in hex format (key images and other data).
+    pub info: String,
+}
+
+/// Return type of wallet `import_multisig_info`.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ImportMultisigInfoResult {
+    /// Number of outputs updated (imported key images).
+    pub n_outputs: u64,
 }
 
 #[cfg(test)]
