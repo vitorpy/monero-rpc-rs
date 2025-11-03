@@ -234,10 +234,24 @@ pub struct TransferData {
     pub amount: Amount,
     #[serde(with = "amount::serde::as_pico")]
     pub fee: Amount,
+    /// For single-sig wallets: contains the signed transaction blob.
+    /// For multisig wallets: this will be empty (use multisig_txset instead).
+    #[serde(default)]
     pub tx_blob: HashString<Vec<u8>>,
+    /// For single-sig wallets: contains the transaction hash.
+    /// For multisig wallets: this will be empty.
+    #[serde(default)]
     pub tx_hash: HashString<CryptoNoteHash>,
+    /// For single-sig wallets: contains the transaction secret key.
+    /// For multisig wallets: this will be empty.
+    #[serde(default)]
     pub tx_key: HashString<Vec<u8>>,
+    /// Transaction metadata (may be empty for multisig).
+    #[serde(default)]
     pub tx_metadata: HashString<Vec<u8>>,
+    /// For single-sig wallets: unsigned transaction set.
+    /// For multisig wallets: this will be empty (use multisig_txset instead).
+    #[serde(default)]
     pub unsigned_txset: HashString<Vec<u8>>,
     /// For multisig wallets: unsigned transaction set that needs to be signed.
     /// This field is populated instead of tx_blob for multisig transactions.
