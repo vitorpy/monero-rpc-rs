@@ -75,13 +75,17 @@ where
 
 impl<'de, T> Deserialize<'de> for HashString<T>
 where
-    T: HashType,
+    T: HashType + Default,
 {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {
         let s = String::deserialize(deserializer)?;
+        // Handle empty strings from multisig wallet responses
+        if s.is_empty() {
+            return Ok(Self(T::default()));
+        }
         Ok(Self(T::from_str(&s).map_err(serde::de::Error::custom)?))
     }
 }
