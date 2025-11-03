@@ -620,6 +620,39 @@ impl DaemonRpcClient {
             .daemon_rpc_request::<TransactionsResponse>("get_transactions", RpcParams::map(params))
             .await
     }
+
+    /// Get outputs by their global indices.
+    ///
+    /// # Arguments
+    ///
+    /// * `outputs` - Vector of (amount, index) pairs. For RingCT outputs, amount should be 0.
+    /// * `get_txid` - If true, include transaction IDs in the response.
+    ///
+    /// # Returns
+    ///
+    /// GetOutsResponse containing output public keys, commitments (masks), and optionally txids.
+    pub async fn get_outs(
+        &self,
+        outputs: Vec<(u64, u64)>,
+        get_txid: bool,
+    ) -> anyhow::Result<GetOutsResponse> {
+        let outputs_vec: Vec<GetOutsEntry> = outputs
+            .into_iter()
+            .map(|(amount, index)| GetOutsEntry { amount, index })
+            .collect();
+
+        let input = GetOutsInput {
+            outputs: outputs_vec,
+            get_txid,
+        };
+
+        self.inner
+            .daemon_rpc_request::<GetOutsResponse>("get_outs", RpcParams::map(
+                once(("outputs", serde_json::to_value(&input.outputs).unwrap()))
+                    .chain(once(("get_txid", get_txid.into())))
+            ))
+            .await
+    }
 }
 
 impl RegtestDaemonJsonRpcClient {

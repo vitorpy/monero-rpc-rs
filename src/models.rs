@@ -681,6 +681,53 @@ pub struct ImportMultisigInfoResult {
     pub n_outputs: u64,
 }
 
+/// Input for daemon `get_outs` request.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct GetOutsInput {
+    /// Array of output references.
+    pub outputs: Vec<GetOutsEntry>,
+    /// If true, include txid in response.
+    #[serde(default)]
+    pub get_txid: bool,
+}
+
+/// Single output reference for get_outs request.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct GetOutsEntry {
+    /// Amount (0 for RingCT outputs).
+    pub amount: u64,
+    /// Global output index.
+    pub index: u64,
+}
+
+/// Output key information from get_outs response.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct OutKey {
+    /// Block height containing this output.
+    pub height: u64,
+    /// Public key of the output (hex string).
+    pub key: String,
+    /// RingCT commitment mask (hex string).
+    pub mask: String,
+    /// Transaction ID containing this output (if get_txid was true).
+    #[serde(default)]
+    pub txid: String,
+    /// Whether the output is unlocked.
+    pub unlocked: bool,
+}
+
+/// Return type of daemon `get_outs`.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct GetOutsResponse {
+    /// Array of output keys.
+    pub outs: Vec<OutKey>,
+    /// Status string.
+    pub status: String,
+    /// Whether result is from bootstrap node (untrusted).
+    #[serde(default)]
+    pub untrusted: bool,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
